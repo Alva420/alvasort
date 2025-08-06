@@ -151,7 +151,7 @@
             </div>
             <p id="reward-message" class="text-gray-600 mb-6"></p>
             <button id="close-reward" class="btn-primary">
-                <i class="fa fa-check mr-2"></i>确定
+                <i class="fa fa-refresh mr-2"></i>再玩一次
             </button>
         </div>
     </div>
@@ -255,7 +255,6 @@
                     </div>
                     <div class="p-3 bg-gray-50 rounded-lg">
                         <p class="font-medium">总游戏次数：<span id="total-games">0</span></p>
-                        <p class="text-sm text-gray-500">胜率：<span id="win-rate">0%</span></p>
                     </div>
                 </div>
             </div>
@@ -272,19 +271,13 @@
         </div>
     </div>
     
-    <!-- 胜利弹窗 -->
+    <!-- 胜利弹窗 (现在仅作为过渡，会自动转为奖励弹窗) -->
     <div id="win-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 hidden">
         <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all duration-500 scale-95 opacity-0" id="modal-content">
             <div class="text-center">
                 <div class="text-5xl mb-4">🎉</div>
                 <h2 class="text-2xl font-bold text-gray-800 mb-2">恭喜你赢了！</h2>
                 <p class="text-gray-600 mb-6">你用了 <span id="final-attempts" class="font-bold text-primary">0</span> 次猜出了正确序列</p>
-                <button id="modal-next" class="btn-primary w-full mb-3">
-                    <i class="fa fa-gift mr-2"></i>领取奖励
-                </button>
-                <button id="modal-restart" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-full transition-all duration-300">
-                    <i class="fa fa-refresh mr-2"></i>再玩一次
-                </button>
             </div>
         </div>
     </div>
@@ -300,6 +293,7 @@
             attempts: 0,
             correctCount: 0,
             history: [],
+            isProcessing: false, // 添加处理状态标志，防止快速点击
             images: {
                 
                 easy: [
@@ -307,7 +301,7 @@
                     { id: 'dyz', name: '典狱长', src: 'images/dyz.png' },
                     { id: 'sxgw', name: '首席顾问', src: 'images/sxgw.png' },
                     { id: 'sxl', name: '升学礼', src: 'images/sxl.png' },
-                    { id: 'xcms', name: '乡村牧师', src: 'images/xcms.png' }, // 替换了原乡村牧师
+                    { id: 'xcms', name: '乡村牧师', src: 'images/xcms.png' },
                     { id: 'ys', name: '游隼', src: 'images/ys.png' },
                     { id: 'hermit', name: '隐士', src: 'images/hermit.png' }
                 ],
@@ -383,14 +377,11 @@
             hardBest: document.getElementById('hard-best'),
             hardLast: document.getElementById('hard-last'),
             totalGames: document.getElementById('total-games'),
-            winRate: document.getElementById('win-rate'),
             
             // 胜利弹窗
             winModal: document.getElementById('win-modal'),
             modalContent: document.getElementById('modal-content'),
             finalAttempts: document.getElementById('final-attempts'),
-            modalNext: document.getElementById('modal-next'),
-            modalRestart: document.getElementById('modal-restart'),
             
             // 奖励弹窗
             rewardModal: document.getElementById('reward-modal'),
@@ -422,8 +413,7 @@
                     stats: {
                         easy: { best: null, last: null },
                         hard: { best: null, last: null },
-                        totalGames: 0,
-                        wins: 0
+                        totalGames: 0
                     },
                     history: []
                 };
@@ -451,9 +441,8 @@
                 
                 if (!user) return;
                 
-                // 更新总游戏次数和胜率
+                // 更新总游戏次数
                 user.stats.totalGames++;
-                user.stats.wins++;
                 
                 // 更新模式特定统计
                 if (!user.stats[mode].best || attempts < user.stats[mode].best) {
@@ -557,6 +546,7 @@
                 gameState.attempts = 0;
                 gameState.correctCount = 0;
                 gameState.selectedItem = null;
+                gameState.isProcessing = false; // 重置处理状态
                 
                 // 根据模式设置序列
                 if (mode === 'easy') {
@@ -606,37 +596,51 @@
                 });
             },
             
-            // 处理图片项点击
+            // 处理图片项点击 - 修复版本
             handleItemClick(index) {
-                // 如果没有选中项，选中当前项
-                if (!gameState.selectedItem) {
-                    gameState.selectedItem = index;
+                // 防止快速连续点击导致的状态混乱
+                if (gameState.isProcessing) return;
+                gameState.isProcessing = true;
+                
+                try {
                     const items = elements.guessContainer.getElementsByClassName('color-item');
-                    items[index].classList.add('selected');
                     
-                    // 显示选中提示
-                    elements.selectedName.textContent = gameState.guessSequence[index].name;
-                    elements.selectedIndicator.classList.remove('hidden');
-                } 
-                // 如果点击的是已选中项，取消选中
-                else if (gameState.selectedItem === index) {
-                    gameState.selectedItem = null;
-                    const items = elements.guessContainer.getElementsByClassName('color-item');
-                    items[index].classList.remove('selected');
-                    elements.selectedIndicator.classList.add('hidden');
-                } 
-                // 交换两个选中项
-                else {
-                    // 交换元素
-                    [gameState.guessSequence[gameState.selectedItem], gameState.guessSequence[index]] = 
-                    [gameState.guessSequence[index], gameState.guessSequence[gameState.selectedItem]];
-                    
-                    // 重新渲染
-                    game.renderGuessSequence();
-                    
-                    // 重置选中状态
-                    gameState.selectedItem = null;
-                    elements.selectedIndicator.classList.add('hidden');
+                    // 如果没有选中项，选中当前项
+                    if (gameState.selectedItem === null) {
+                        gameState.selectedItem = index;
+                        items[index].classList.add('selected');
+                        
+                        // 显示选中提示
+                        elements.selectedName.textContent = gameState.guessSequence[index].name;
+                        elements.selectedIndicator.classList.remove('hidden');
+                    } 
+                    // 如果点击的是已选中项，取消选中
+                    else if (gameState.selectedItem === index) {
+                        gameState.selectedItem = null;
+                        items[index].classList.remove('selected');
+                        elements.selectedIndicator.classList.add('hidden');
+                    } 
+                    // 交换两个选中项
+                    else {
+                        // 移除之前选中项的样式
+                        items[gameState.selectedItem].classList.remove('selected');
+                        
+                        // 交换元素
+                        [gameState.guessSequence[gameState.selectedItem], gameState.guessSequence[index]] = 
+                        [gameState.guessSequence[index], gameState.guessSequence[gameState.selectedItem]];
+                        
+                        // 重新渲染
+                        game.renderGuessSequence();
+                        
+                        // 重置选中状态和提示
+                        gameState.selectedItem = null;
+                        elements.selectedIndicator.classList.add('hidden');
+                    }
+                } finally {
+                    // 无论如何都重置处理状态
+                    setTimeout(() => {
+                        gameState.isProcessing = false;
+                    }, 100); // 短暂延迟确保渲染完成
                 }
             },
             
@@ -662,7 +666,7 @@
                 }
             },
             
-            // 处理胜利
+            // 处理胜利 - 修改为直接显示奖励
             handleWin() {
                 // 显示目标序列
                 elements.targetContainer.classList.remove('hidden');
@@ -678,9 +682,15 @@
                 // 更新UI统计
                 game.updatePlayerStats(updatedUser);
                 
-                // 显示胜利弹窗
+                // 显示胜利弹窗短暂时间后自动切换到奖励弹窗
                 elements.finalAttempts.textContent = gameState.attempts;
                 utils.showModal(elements.winModal, elements.modalContent);
+                
+                // 2秒后自动显示奖励图片
+                setTimeout(() => {
+                    utils.hideModal(elements.winModal, elements.modalContent);
+                    game.showReward();
+                }, 2000);
             },
             
             // 渲染目标序列
@@ -753,10 +763,8 @@
                 elements.rewardImage.alt = '游戏奖励图片';
                 elements.rewardMessage.textContent = rewardText;
                 
-                utils.hideModal(elements.winModal, elements.modalContent);
-                setTimeout(() => {
-                    utils.showModal(elements.rewardModal);
-                }, 300);
+                // 直接显示奖励弹窗
+                utils.showModal(elements.rewardModal);
             },
             
             // 更新玩家统计
@@ -775,12 +783,6 @@
                 
                 // 更新总统计
                 elements.totalGames.textContent = user.stats.totalGames;
-                
-                // 计算胜率
-                const winRate = user.stats.totalGames > 0 
-                    ? Math.round((user.stats.wins / user.stats.totalGames) * 100) 
-                    : 0;
-                elements.winRate.textContent = `${winRate}%`;
                 
                 // 更新历史记录
                 elements.historyContainer.innerHTML = '';
@@ -914,17 +916,6 @@
             // 提交猜测
             elements.submitBtn.addEventListener('click', () => {
                 game.submitGuess();
-            });
-            
-            // 胜利弹窗 - 下一个（领取奖励）
-            elements.modalNext.addEventListener('click', () => {
-                game.showReward();
-            });
-            
-            // 胜利弹窗 - 再玩一次
-            elements.modalRestart.addEventListener('click', () => {
-                utils.hideModal(elements.winModal, elements.modalContent);
-                game.init(gameState.mode);
             });
             
             // 关闭奖励弹窗
