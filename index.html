@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>隐家大院排序猜测游戏</title>
+    <!-- 引入Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- 配置Tailwind自定义颜色和字体 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#6366f1',
+                        secondary: '#8b5cf6',
+                        accent: '#ec4899',
+                        neutral: '#1f2937',
+                        'neutral-light': '#f3f4f6',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <!-- 自定义工具类 -->
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .color-item {
+                @apply w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center text-2xl md:text-3xl cursor-pointer transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105;
+            }
+            .color-item.selected {
+                @apply ring-4 ring-accent scale-110;
+            }
+            .color-img {
+                @apply w-full h-full object-cover rounded-full;
+            }
+            .color-container {
+                @apply flex gap-2 md:gap-3 flex-wrap justify-center p-4 bg-white/50 backdrop-blur-sm rounded-xl shadow-lg;
+            }
+            .btn-primary {
+                @apply bg-primary hover:bg-primary/90 text-white font-bold py-3 px-6 rounded-full transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-primary/50;
+            }
+            .game-card {
+                @apply bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-xl p-6 md:p-8 transition-all duration-500 hover:shadow-2xl;
+            }
+            .auth-input {
+                @apply w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all outline-none;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 font-sans text-neutral flex flex-col items-center justify-start pt-8 pb-16 px-4">
+    <!-- 选中提示 -->
+    <div id="selected-indicator" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 bg-accent text-white px-4 py-2 rounded-full shadow-lg z-40">
+        <span>已选中: </span>
+        <span id="selected-name" class="font-bold"></span>
+    </div>
+
+    <!-- 用户认证模态框 -->
+    <div id="auth-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">隐家大院排序大师</h2>
+                <p class="text-gray-600">请登录或注册账号</p>
+            </div>
+            
+            <!-- 切换表单按钮 -->
+            <div class="flex mb-6">
+                <button id="login-tab" class="flex-1 py-2 font-medium text-primary border-b-2 border-primary">登录</button>
+                <button id="register-tab" class="flex-1 py-2 font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700">注册</button>
+            </div>
+            
+            <!-- 登录表单 -->
+            <div id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 mb-1" for="login-username">用户名</label>
+                    <input type="text" id="login-username" class="auth-input" placeholder="请输入用户名">
+                </div>
+                <div>
+                    <label class="block text-gray-700 mb-1" for="login-password">密码</label>
+                    <input type="password" id="login-password" class="auth-input" placeholder="请输入密码">
+                </div>
+                <button id="login-btn" class="btn-primary w-full">
+                    <i class="fa fa-sign-in mr-2"></i>登录
+                </button>
+                <p id="login-error" class="text-red-500 text-center hidden"></p>
+            </div>
+            
+            <!-- 注册表单 (默认隐藏) -->
+            <div id="register-form" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-gray-700 mb-1" for="reg-username">用户名</label>
+                    <input type="text" id="reg-username" class="auth-input" placeholder="请创建用户名">
+                </div>
+                <div>
+                    <label class="block text-gray-700 mb-1" for="reg-password">密码</label>
+                    <input type="password" id="reg-password" class="auth-input" placeholder="请创建密码">
+                </div>
+                <div>
+                    <label class="block text-gray-700 mb-1" for="reg-confirm">确认密码</label>
+                    <input type="password" id="reg-confirm" class="auth-input" placeholder="请确认密码">
+                </div>
+                <button id="register-btn" class="btn-primary w-full">
+                    <i class="fa fa-user-plus mr-2"></i>注册
+                </button>
+                <p id="register-error" class="text-red-500 text-center hidden"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模式选择模态框 -->
+    <div id="mode-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">选择游戏模式</h2>
+                <p class="text-gray-600">欢迎回来，<span id="welcome-username" class="font-semibold text-primary"></span>！</p>
+            </div>
+            
+            <div class="space-y-4">
+                <!-- 简单模式 -->
+                <div class="border border-gray-200 rounded-xl p-5 hover:border-primary cursor-pointer transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg" id="easy-mode">
+                    <h3 class="text-xl font-bold text-gray-800 mb-2">简单模式</h3>
+                    <p class="text-gray-600 mb-3">7个图像排序</p>
+                </div>
+                
+                <!-- 困难模式 -->
+                <div class="border border-gray-200 rounded-xl p-5 hover:border-primary cursor-pointer transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg" id="hard-mode">
+                    <h3 class="text-xl font-bold text-gray-800 mb-2">困难模式</h3>
+                    <p class="text-gray-600 mb-3">10个图像排序</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 奖励图片模态框 -->
+    <div id="reward-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">恭喜获得奖励！</h2>
+            <div class="mb-6 flex justify-center">
+                <img id="reward-image" src="" alt="奖励图片" class="max-h-64 rounded-lg shadow-lg">
+            </div>
+            <p id="reward-message" class="text-gray-600 mb-6"></p>
+            <button id="close-reward" class="btn-primary">
+                <i class="fa fa-check mr-2"></i>确定
+            </button>
+        </div>
+    </div>
+
+    <!-- 游戏容器 -->
+    <div class="max-w-3xl w-full hidden" id="game-container">
+        <!-- 当前用户信息 -->
+        <div class="flex justify-end items-center mb-4">
+            <div class="bg-white px-4 py-2 rounded-full shadow flex items-center gap-2">
+                <i class="fa fa-user text-primary"></i>
+                <span id="current-user" class="font-medium"></span>
+                <button id="logout-btn" class="text-gray-500 hover:text-red-500 transition-colors">
+                    <i class="fa fa-sign-out"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- 游戏标题 -->
+        <div class="text-center mb-8">
+            <h1 class="text-[clamp(2rem,5vw,3rem)] font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary mb-2">隐家大院排序大师</h1>
+            <p class="text-gray-600 text-lg" id="mode-display">简单模式 - 7个图像排序</p>
+        </div>
+        
+        <!-- 游戏卡片 -->
+        <div class="game-card mb-8">
+            <!-- 游戏信息区 -->
+            <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white px-4 py-2 rounded-full shadow flex items-center gap-2">
+                        <i class="fa fa-refresh text-primary"></i>
+                        <span id="attempts" class="font-bold">猜测次数: 0</span>
+                    </div>
+                    <div class="bg-white px-4 py-2 rounded-full shadow flex items-center gap-2">
+                        <i class="fa fa-check-circle text-accent"></i>
+                        <span id="correct-count" class="font-bold">正确数量: 0</span>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button id="change-mode-btn" class="flex items-center gap-2 bg-secondary hover:bg-secondary/90 text-white px-4 py-2 rounded-full transition-all duration-300">
+                        <i class="fa fa-exchange"></i>
+                        <span>更换模式</span>
+                    </button>
+                    <button id="restart-btn" class="flex items-center gap-2 bg-neutral hover:bg-neutral/90 text-white px-4 py-2 rounded-full transition-all duration-300">
+                        <i class="fa fa-gamepad"></i>
+                        <span>重新开始</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 目标序列区域 (初始隐藏) -->
+            <div id="target-container" class="hidden mb-8">
+                <h2 class="text-xl font-semibold mb-3 text-center text-gray-700">目标序列</h2>
+                <div id="target-sequence" class="color-container"></div>
+            </div>
+            
+            <!-- 玩家排序区域 -->
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold mb-3 text-center text-gray-700">请排序你的猜测</h2>
+                <div id="guess-container" class="color-container min-h-[100px]">
+                    <!-- 图片项将通过JS动态生成 -->
+                </div>
+            </div>
+            
+            <!-- 提交按钮 -->
+            <div class="text-center">
+                <button id="submit-btn" class="btn-primary">
+                    <i class="fa fa-paper-plane mr-2"></i>提交猜测
+                </button>
+            </div>
+        </div>
+        
+        <!-- 游戏说明 -->
+        <div class="bg-white rounded-xl shadow-md p-5 mb-8">
+            <h3 class="text-lg font-semibold mb-2 text-gray-800 flex items-center">
+                <i class="fa fa-info-circle text-primary mr-2"></i>游戏说明
+            </h3>
+            <ul class="list-disc pl-5 text-gray-600 space-y-1">
+                <li>图片资源来源于网易第五人格，本程序仅供娱乐不做商用</li>
+                <li>点击第一张图片，再点击第二张图片进行交换</li>
+                <li>每次提交后，会显示你猜对位置的图片数量</li>
+                <li>目标是找出正确的图片排列顺序</li>
+                <li>尝试用最少的次数完成挑战！</li>
+            </ul>
+        </div>
+        
+        <!-- 玩家记录和历史 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- 玩家记录 -->
+            <div class="bg-white rounded-xl shadow-md p-5">
+                <h3 class="text-lg font-semibold mb-3 text-gray-800 flex items-center">
+                    <i class="fa fa-trophy text-primary mr-2"></i>我的记录
+                </h3>
+                <div id="player-stats" class="space-y-3">
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <p class="font-medium">简单模式最佳：<span id="easy-best" class="text-green-600">-</span></p>
+                        <p class="text-sm text-gray-500">上次：<span id="easy-last">-</span></p>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <p class="font-medium">困难模式最佳：<span id="hard-best" class="text-green-600">-</span></p>
+                        <p class="text-sm text-gray-500">上次：<span id="hard-last">-</span></p>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <p class="font-medium">总游戏次数：<span id="total-games">0</span></p>
+                        <p class="text-sm text-gray-500">胜率：<span id="win-rate">0%</span></p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 历史记录 -->
+            <div class="bg-white rounded-xl shadow-md p-5">
+                <h3 class="text-lg font-semibold mb-3 text-gray-800 flex items-center">
+                    <i class="fa fa-history text-primary mr-2"></i>最近记录
+                </h3>
+                <div id="history-container" class="space-y-3 max-h-60 overflow-y-auto pr-2">
+                    <p class="text-gray-500 text-center italic">暂无游戏记录</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 胜利弹窗 -->
+    <div id="win-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all duration-500 scale-95 opacity-0" id="modal-content">
+            <div class="text-center">
+                <div class="text-5xl mb-4">🎉</div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">恭喜你赢了！</h2>
+                <p class="text-gray-600 mb-6">你用了 <span id="final-attempts" class="font-bold text-primary">0</span> 次猜出了正确序列</p>
+                <button id="modal-next" class="btn-primary w-full mb-3">
+                    <i class="fa fa-gift mr-2"></i>领取奖励
+                </button>
+                <button id="modal-restart" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-full transition-all duration-300">
+                    <i class="fa fa-refresh mr-2"></i>再玩一次
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 游戏配置和状态
+        const gameState = {
+            currentUser: null,
+            mode: null, // 'easy' 或 'hard'
+            targetSequence: [],
+            guessSequence: [],
+            selectedItem: null,
+            attempts: 0,
+            correctCount: 0,
+            history: [],
+            images: {
+                
+                easy: [
+                    { id: 'bj', name: '薄金', src: 'images/bj.png' },
+                    { id: 'dyz', name: '典狱长', src: 'images/dyz.png' },
+                    { id: 'sxgw', name: '首席顾问', src: 'images/sxgw.png' },
+                    { id: 'sxl', name: '升学礼', src: 'images/sxl.png' },
+                    { id: 'xcms', name: '乡村牧师', src: 'images/xcms.png' }, // 替换了原乡村牧师
+                    { id: 'ys', name: '游隼', src: 'images/ys.png' },
+                    { id: 'hermit', name: '隐士', src: 'images/hermit.png' }
+                ],
+                // 困难模式图片
+                hard: [
+                    { id: 'txdt', name: '动态头像', src: 'images/txdt.png' },
+                    { id: 'txdyz', name: '典狱长', src: 'images/txdyz.jpg' },
+                    { id: 'txys', name: '游隼', src: 'images/txys.jpg' },
+                    { id: 'txds', name: '大暑头像', src: 'images/txds.jpg' },
+                    { id: 'txhb', name: '黑白头像', src: 'images/txhb.png' },
+                    { id: 'txbj', name: '薄金', src: 'images/txbj.jpg' },
+                    { id: 'txbjq', name: '薄金Q版', src: 'images/txbjq.jpg' },
+                    { id: 'txcshy', name: '彩色回忆', src: 'images/txcshy.png' },
+                    { id: 'txlym', name: '另一面', src: 'images/txlym.png' },
+                    { id: 'txsxgw', name: '首席顾问', src: 'images/txsxgw.png' }
+                ],
+                // 奖励图片
+                rewards: {
+                    jl: 'images/jl.png',
+                    jl1: 'images/jl1.png',
+                    jl2: 'images/jl2.png',
+                    jl3: 'images/jl3.jpg'
+                }
+            }
+        };
+
+        // DOM元素
+        const elements = {
+            // 认证相关
+            authModal: document.getElementById('auth-modal'),
+            loginTab: document.getElementById('login-tab'),
+            registerTab: document.getElementById('register-tab'),
+            loginForm: document.getElementById('login-form'),
+            registerForm: document.getElementById('register-form'),
+            loginBtn: document.getElementById('login-btn'),
+            registerBtn: document.getElementById('register-btn'),
+            loginUsername: document.getElementById('login-username'),
+            loginPassword: document.getElementById('login-password'),
+            regUsername: document.getElementById('reg-username'),
+            regPassword: document.getElementById('reg-password'),
+            regConfirm: document.getElementById('reg-confirm'),
+            loginError: document.getElementById('login-error'),
+            registerError: document.getElementById('register-error'),
+            
+            // 模式选择
+            modeModal: document.getElementById('mode-modal'),
+            welcomeUsername: document.getElementById('welcome-username'),
+            easyMode: document.getElementById('easy-mode'),
+            hardMode: document.getElementById('hard-mode'),
+            
+            // 游戏容器
+            gameContainer: document.getElementById('game-container'),
+            currentUser: document.getElementById('current-user'),
+            modeDisplay: document.getElementById('mode-display'),
+            logoutBtn: document.getElementById('logout-btn'),
+            changeModeBtn: document.getElementById('change-mode-btn'),
+            
+            // 游戏元素
+            attempts: document.getElementById('attempts'),
+            correctCount: document.getElementById('correct-count'),
+            restartBtn: document.getElementById('restart-btn'),
+            submitBtn: document.getElementById('submit-btn'),
+            targetContainer: document.getElementById('target-container'),
+            targetSequence: document.getElementById('target-sequence'),
+            guessContainer: document.getElementById('guess-container'),
+            selectedIndicator: document.getElementById('selected-indicator'),
+            selectedName: document.getElementById('selected-name'),
+            historyContainer: document.getElementById('history-container'),
+            
+            // 玩家记录
+            easyBest: document.getElementById('easy-best'),
+            easyLast: document.getElementById('easy-last'),
+            hardBest: document.getElementById('hard-best'),
+            hardLast: document.getElementById('hard-last'),
+            totalGames: document.getElementById('total-games'),
+            winRate: document.getElementById('win-rate'),
+            
+            // 胜利弹窗
+            winModal: document.getElementById('win-modal'),
+            modalContent: document.getElementById('modal-content'),
+            finalAttempts: document.getElementById('final-attempts'),
+            modalNext: document.getElementById('modal-next'),
+            modalRestart: document.getElementById('modal-restart'),
+            
+            // 奖励弹窗
+            rewardModal: document.getElementById('reward-modal'),
+            rewardImage: document.getElementById('reward-image'),
+            rewardMessage: document.getElementById('reward-message'),
+            closeReward: document.getElementById('close-reward')
+        };
+
+        // 玩家数据库 (使用localStorage)
+        const playerDB = {
+            // 初始化数据库
+            init() {
+                if (!localStorage.getItem('players')) {
+                    localStorage.setItem('players', JSON.stringify({}));
+                }
+            },
+            
+            // 注册新用户
+            register(username, password) {
+                const players = JSON.parse(localStorage.getItem('players'));
+                
+                if (players[username]) {
+                    return { success: false, message: '用户名已存在' };
+                }
+                
+                // 创建新用户
+                players[username] = {
+                    password,
+                    stats: {
+                        easy: { best: null, last: null },
+                        hard: { best: null, last: null },
+                        totalGames: 0,
+                        wins: 0
+                    },
+                    history: []
+                };
+                
+                localStorage.setItem('players', JSON.stringify(players));
+                return { success: true };
+            },
+            
+            // 用户登录
+            login(username, password) {
+                const players = JSON.parse(localStorage.getItem('players'));
+                const user = players[username];
+                
+                if (!user || user.password !== password) {
+                    return { success: false, message: '用户名或密码错误' };
+                }
+                
+                return { success: true, user };
+            },
+            
+            // 更新玩家统计
+            updateStats(username, mode, attempts) {
+                const players = JSON.parse(localStorage.getItem('players'));
+                const user = players[username];
+                
+                if (!user) return;
+                
+                // 更新总游戏次数和胜率
+                user.stats.totalGames++;
+                user.stats.wins++;
+                
+                // 更新模式特定统计
+                if (!user.stats[mode].best || attempts < user.stats[mode].best) {
+                    user.stats[mode].best = attempts;
+                }
+                user.stats[mode].last = attempts;
+                
+                // 记录历史
+                const now = new Date();
+                const dateStr = `${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${now.getMinutes()}`;
+                user.history.unshift({
+                    mode,
+                    attempts,
+                    date: dateStr
+                });
+                
+                // 限制历史记录数量
+                if (user.history.length > 10) {
+                    user.history = user.history.slice(0, 10);
+                }
+                
+                localStorage.setItem('players', JSON.stringify(players));
+                return user;
+            },
+            
+            // 获取玩家数据
+            getPlayer(username) {
+                const players = JSON.parse(localStorage.getItem('players'));
+                return players[username];
+            }
+        };
+
+        // 工具函数
+        const utils = {
+            // 打乱数组顺序
+            shuffleArray(array) {
+                const newArray = [...array];
+                for (let i = newArray.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+                }
+                return newArray;
+            },
+            
+            // 检查两个数组是否相等
+            arraysEqual(arr1, arr2) {
+                if (arr1.length !== arr2.length) return false;
+                return arr1.every((item, index) => item.id === arr2[index].id);
+            },
+            
+            // 计算正确位置的数量
+            countCorrectPositions(arr1, arr2) {
+                let count = 0;
+                for (let i = 0; i < arr1.length; i++) {
+                    if (arr1[i].id === arr2[i].id) {
+                        count++;
+                    }
+                }
+                return count;
+            },
+            
+            // 显示错误消息
+            showError(element, message) {
+                element.textContent = message;
+                element.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    element.classList.add('hidden');
+                }, 3000);
+            },
+            
+            // 显示模态框动画
+            showModal(modal, content) {
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    if (content) {
+                        content.classList.remove('scale-95', 'opacity-0');
+                        content.classList.add('scale-100', 'opacity-100');
+                    }
+                }, 10);
+            },
+            
+            // 隐藏模态框动画
+            hideModal(modal, content) {
+                if (content) {
+                    content.classList.remove('scale-100', 'opacity-100');
+                    content.classList.add('scale-95', 'opacity-0');
+                }
+                
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 300);
+            }
+        };
+
+        // 游戏函数
+        const game = {
+            // 初始化游戏
+            init(mode) {
+                gameState.mode = mode;
+                gameState.attempts = 0;
+                gameState.correctCount = 0;
+                gameState.selectedItem = null;
+                
+                // 根据模式设置序列
+                if (mode === 'easy') {
+                    gameState.targetSequence = [...gameState.images.easy];
+                    elements.modeDisplay.textContent = '简单模式 - 7个图像排序';
+                } else {
+                    gameState.targetSequence = [...gameState.images.hard];
+                    elements.modeDisplay.textContent = '困难模式 - 10个图像排序';
+                }
+                
+                // 打乱序列作为玩家初始序列
+                gameState.guessSequence = utils.shuffleArray(gameState.targetSequence);
+                
+                // 更新UI
+                game.updateUI();
+                game.renderGuessSequence();
+                game.updatePlayerStats();
+            },
+            
+            // 更新游戏UI
+            updateUI() {
+                elements.attempts.textContent = `猜测次数: ${gameState.attempts}`;
+                elements.correctCount.textContent = `正确数量: ${gameState.correctCount}`;
+                elements.targetContainer.classList.add('hidden');
+            },
+            
+            // 渲染玩家猜测序列
+            renderGuessSequence() {
+                elements.guessContainer.innerHTML = '';
+                
+                gameState.guessSequence.forEach((item, index) => {
+                    const element = document.createElement('div');
+                    element.className = 'color-item';
+                    element.dataset.index = index;
+                    
+                    const img = document.createElement('img');
+                    img.src = item.src;
+                    img.alt = item.name;
+                    img.className = 'color-img';
+                    
+                    element.appendChild(img);
+                    
+                    // 添加点击事件用于选择和交换
+                    element.addEventListener('click', () => game.handleItemClick(index));
+                    
+                    elements.guessContainer.appendChild(element);
+                });
+            },
+            
+            // 处理图片项点击
+            handleItemClick(index) {
+                // 如果没有选中项，选中当前项
+                if (!gameState.selectedItem) {
+                    gameState.selectedItem = index;
+                    const items = elements.guessContainer.getElementsByClassName('color-item');
+                    items[index].classList.add('selected');
+                    
+                    // 显示选中提示
+                    elements.selectedName.textContent = gameState.guessSequence[index].name;
+                    elements.selectedIndicator.classList.remove('hidden');
+                } 
+                // 如果点击的是已选中项，取消选中
+                else if (gameState.selectedItem === index) {
+                    gameState.selectedItem = null;
+                    const items = elements.guessContainer.getElementsByClassName('color-item');
+                    items[index].classList.remove('selected');
+                    elements.selectedIndicator.classList.add('hidden');
+                } 
+                // 交换两个选中项
+                else {
+                    // 交换元素
+                    [gameState.guessSequence[gameState.selectedItem], gameState.guessSequence[index]] = 
+                    [gameState.guessSequence[index], gameState.guessSequence[gameState.selectedItem]];
+                    
+                    // 重新渲染
+                    game.renderGuessSequence();
+                    
+                    // 重置选中状态
+                    gameState.selectedItem = null;
+                    elements.selectedIndicator.classList.add('hidden');
+                }
+            },
+            
+            // 提交猜测
+            submitGuess() {
+                gameState.attempts++;
+                
+                // 计算正确数量
+                gameState.correctCount = utils.countCorrectPositions(
+                    gameState.targetSequence, 
+                    gameState.guessSequence
+                );
+                
+                // 更新UI
+                game.updateUI();
+                
+                // 添加到历史记录
+                game.addToHistory();
+                
+                // 检查是否猜对
+                if (utils.arraysEqual(gameState.targetSequence, gameState.guessSequence)) {
+                    game.handleWin();
+                }
+            },
+            
+            // 处理胜利
+            handleWin() {
+                // 显示目标序列
+                elements.targetContainer.classList.remove('hidden');
+                game.renderTargetSequence();
+                
+                // 更新玩家统计
+                const updatedUser = playerDB.updateStats(
+                    gameState.currentUser.username, 
+                    gameState.mode, 
+                    gameState.attempts
+                );
+                
+                // 更新UI统计
+                game.updatePlayerStats(updatedUser);
+                
+                // 显示胜利弹窗
+                elements.finalAttempts.textContent = gameState.attempts;
+                utils.showModal(elements.winModal, elements.modalContent);
+            },
+            
+            // 渲染目标序列
+            renderTargetSequence() {
+                elements.targetSequence.innerHTML = '';
+                
+                gameState.targetSequence.forEach(item => {
+                    const element = document.createElement('div');
+                    element.className = 'color-item';
+                    
+                    const img = document.createElement('img');
+                    img.src = item.src;
+                    img.alt = item.name;
+                    img.className = 'color-img';
+                    
+                    element.appendChild(img);
+                    elements.targetSequence.appendChild(element);
+                });
+            },
+            
+            // 添加到历史记录
+            addToHistory() {
+                const entry = document.createElement('div');
+                entry.className = 'p-2 bg-gray-50 rounded-lg flex justify-between items-center';
+                
+                const info = document.createElement('div');
+                info.innerHTML = `
+                    <span class="font-medium">第 ${gameState.attempts} 次</span>
+                    <span class="text-gray-600 ml-2">正确: ${gameState.correctCount}/${gameState.targetSequence.length}</span>
+                `;
+                
+                entry.appendChild(info);
+                elements.historyContainer.prepend(entry);
+                
+                // 如果是第一条记录，移除"暂无历史记录"提示
+                if (elements.historyContainer.querySelector('p.italic')) {
+                    elements.historyContainer.innerHTML = '';
+                }
+                
+                // 限制历史记录显示数量
+                if (elements.historyContainer.children.length > 5) {
+                    elements.historyContainer.removeChild(elements.historyContainer.lastChild);
+                }
+            },
+            
+            // 显示奖励
+            showReward() {
+                let rewardImage, rewardText;
+                const { mode, attempts } = gameState;
+                
+                if (mode === 'easy') {
+                    if (attempts <= 15) {
+                        rewardImage = gameState.images.rewards.jl;
+                        rewardText = '恭喜你在15次内完成简单模式！';
+                    } else {
+                        rewardImage = gameState.images.rewards.jl2;
+                        rewardText = '你已完成简单模式';
+                    }
+                } else { // hard mode
+                    if (attempts <= 25) {
+                        rewardImage = gameState.images.rewards.jl3;
+                        rewardText = '恭喜你在25次内完成困难模式';
+                    } else {
+                        rewardImage = gameState.images.rewards.jl1;
+                        rewardText = '你已完成困难模式';
+                    }
+                }
+                
+                elements.rewardImage.src = rewardImage;
+                elements.rewardImage.alt = '游戏奖励图片';
+                elements.rewardMessage.textContent = rewardText;
+                
+                utils.hideModal(elements.winModal, elements.modalContent);
+                setTimeout(() => {
+                    utils.showModal(elements.rewardModal);
+                }, 300);
+            },
+            
+            // 更新玩家统计
+            updatePlayerStats(userData) {
+                const user = userData || playerDB.getPlayer(gameState.currentUser.username);
+                
+                if (!user) return;
+                
+                // 更新简单模式统计
+                elements.easyBest.textContent = user.stats.easy.best || '-';
+                elements.easyLast.textContent = user.stats.easy.last || '-';
+                
+                // 更新困难模式统计
+                elements.hardBest.textContent = user.stats.hard.best || '-';
+                elements.hardLast.textContent = user.stats.hard.last || '-';
+                
+                // 更新总统计
+                elements.totalGames.textContent = user.stats.totalGames;
+                
+                // 计算胜率
+                const winRate = user.stats.totalGames > 0 
+                    ? Math.round((user.stats.wins / user.stats.totalGames) * 100) 
+                    : 0;
+                elements.winRate.textContent = `${winRate}%`;
+                
+                // 更新历史记录
+                elements.historyContainer.innerHTML = '';
+                if (user.history.length === 0) {
+                    elements.historyContainer.innerHTML = '<p class="text-gray-500 text-center italic">暂无游戏记录</p>';
+                } else {
+                    user.history.forEach(entry => {
+                        const historyItem = document.createElement('div');
+                        historyItem.className = 'p-2 bg-gray-50 rounded-lg';
+                        
+                        const modeText = entry.mode === 'easy' ? '简单模式' : '困难模式';
+                        
+                        historyItem.innerHTML = `
+                            <div class="flex justify-between">
+                                <span class="font-medium">${modeText}</span>
+                                <span class="text-sm text-gray-500">${entry.date}</span>
+                            </div>
+                            <div class="text-gray-600 text-sm">尝试次数: ${entry.attempts}</div>
+                        `;
+                        
+                        elements.historyContainer.appendChild(historyItem);
+                    });
+                }
+            }
+        };
+
+        // 事件监听器
+        function setupEventListeners() {
+            // 切换登录/注册表单
+            elements.loginTab.addEventListener('click', () => {
+                elements.loginForm.classList.remove('hidden');
+                elements.registerForm.classList.add('hidden');
+                elements.loginTab.classList.add('text-primary', 'border-primary');
+                elements.loginTab.classList.remove('text-gray-500', 'border-transparent');
+                elements.registerTab.classList.add('text-gray-500', 'border-transparent');
+                elements.registerTab.classList.remove('text-primary', 'border-primary');
+            });
+            
+            elements.registerTab.addEventListener('click', () => {
+                elements.registerForm.classList.remove('hidden');
+                elements.loginForm.classList.add('hidden');
+                elements.registerTab.classList.add('text-primary', 'border-primary');
+                elements.registerTab.classList.remove('text-gray-500', 'border-transparent');
+                elements.loginTab.classList.add('text-gray-500', 'border-transparent');
+                elements.loginTab.classList.remove('text-primary', 'border-primary');
+            });
+            
+            // 注册按钮
+            elements.registerBtn.addEventListener('click', () => {
+                const username = elements.regUsername.value.trim();
+                const password = elements.regPassword.value;
+                const confirm = elements.regConfirm.value;
+                
+                if (!username || !password) {
+                    utils.showError(elements.registerError, '用户名和密码不能为空');
+                    return;
+                }
+                
+                if (password !== confirm) {
+                    utils.showError(elements.registerError, '两次密码输入不一致');
+                    return;
+                }
+                
+                const result = playerDB.register(username, password);
+                if (!result.success) {
+                    utils.showError(elements.registerError, result.message);
+                    return;
+                }
+                
+                // 注册成功，切换到登录表单
+                elements.loginTab.click();
+                elements.loginUsername.value = username;
+                utils.showError(elements.registerError, '注册成功，请登录', 'green');
+            });
+            
+            // 登录按钮
+            elements.loginBtn.addEventListener('click', () => {
+                const username = elements.loginUsername.value.trim();
+                const password = elements.loginPassword.value;
+                
+                if (!username || !password) {
+                    utils.showError(elements.loginError, '用户名和密码不能为空');
+                    return;
+                }
+                
+                const result = playerDB.login(username, password);
+                if (!result.success) {
+                    utils.showError(elements.loginError, result.message);
+                    return;
+                }
+                
+                // 登录成功
+                gameState.currentUser = {
+                    username,
+                    data: result.user
+                };
+                
+                elements.welcomeUsername.textContent = username;
+                elements.currentUser.textContent = username;
+                
+                // 隐藏登录模态框，显示模式选择
+                elements.authModal.classList.add('hidden');
+                elements.modeModal.classList.remove('hidden');
+            });
+            
+            // 选择简单模式
+            elements.easyMode.addEventListener('click', () => {
+                elements.modeModal.classList.add('hidden');
+                elements.gameContainer.classList.remove('hidden');
+                game.init('easy');
+            });
+            
+            // 选择困难模式
+            elements.hardMode.addEventListener('click', () => {
+                elements.modeModal.classList.add('hidden');
+                elements.gameContainer.classList.remove('hidden');
+                game.init('hard');
+            });
+            
+            // 重新开始游戏
+            elements.restartBtn.addEventListener('click', () => {
+                game.init(gameState.mode);
+            });
+            
+            // 更换模式
+            elements.changeModeBtn.addEventListener('click', () => {
+                elements.gameContainer.classList.add('hidden');
+                elements.modeModal.classList.remove('hidden');
+            });
+            
+            // 提交猜测
+            elements.submitBtn.addEventListener('click', () => {
+                game.submitGuess();
+            });
+            
+            // 胜利弹窗 - 下一个（领取奖励）
+            elements.modalNext.addEventListener('click', () => {
+                game.showReward();
+            });
+            
+            // 胜利弹窗 - 再玩一次
+            elements.modalRestart.addEventListener('click', () => {
+                utils.hideModal(elements.winModal, elements.modalContent);
+                game.init(gameState.mode);
+            });
+            
+            // 关闭奖励弹窗
+            elements.closeReward.addEventListener('click', () => {
+                utils.hideModal(elements.rewardModal);
+                game.init(gameState.mode);
+            });
+            
+            // 登出
+            elements.logoutBtn.addEventListener('click', () => {
+                gameState.currentUser = null;
+                elements.gameContainer.classList.add('hidden');
+                elements.modeModal.classList.add('hidden');
+                elements.authModal.classList.remove('hidden');
+                
+                // 重置表单
+                elements.loginUsername.value = '';
+                elements.loginPassword.value = '';
+                elements.regUsername.value = '';
+                elements.regPassword.value = '';
+                elements.regConfirm.value = '';
+                elements.loginTab.click();
+            });
+        }
+
+        // 初始化应用
+        function initApp() {
+            playerDB.init();
+            setupEventListeners();
+        }
+
+        // 启动应用
+        initApp();
+    </script>
+</body>
+</html>
